@@ -1,0 +1,102 @@
+---
+#SSH passwordless
+- name: upgrade all packages
+  dnf:
+    name: "*"
+    state: latest  
+    
+- name: Block SSH passwordless
+  tags: ssh_passwordless
+  block:
+  - name: check .ssh local directory exists
+    stat:
+      path: "~.ssh"
+    register: ssh_dir_exist
+
+  - name: Create .ssh dir if it not exists
+    file:
+      path: "~/.ssh"
+      state: directory
+      mode: "0700"
+    register: ssh_directory_create
+    when: ssh_dir_exist is defined and ssh_dir_exist.stat.exists == false
+
+  - name: Check tools for ssh need
+    shell: which sshpass ssh-keygen ssh-copy-id
+    register: ssh_tools_exist
+    ignore_errors: true
+
+  - name: Install tools when needs
+    dnf:
+      name: 
+        - sshpass 
+      state: present
+    when: ssh_tools_exist.rc != 0
+
+  - name: Check .ssh key file exists
+    stat:
+      path: "~/.ssh/{{ item }}"
+    register: ssh_key_files_exist
+    with_items:
+      - id_rsa
+      - id_rsa.pub
+
+  - name: Generate ssh key when it not exists
+    command: "ssh-keygen -t rsa -f ~/.ssh/id_rsa -P \"\""
+    when: ssh_key_files_exist is defined and ssh_key_files_exist.results[0].stat.exists == false
+
+#  - name: debug
+#    debug: var=hostvars[item]['ansible_eth1']['ipv4']['address']
+#    with_items:
+#        - "{{ groups['target_nodes'] }}"
+
+  - name: gather facts from target node
+    setup:
+    delegate_to: "{{item}}"
+    delegate_facts: true
+    with_items: 
+      - "{{ variable_group_hosts }}"
+ 
+  - debug:
+      var: hostvars[item]['ansible_%s' | format('{{ main_interface }}')].ipv4.address
+    with_items:
+      - "{{ variable_group_hosts }}"
+
+  - name: Check and update PasswordAuthetication sshd_config to let it ssh with password
+    lineinfile:
+      path: /etc/ssh/sshd_config
+      regexp: '^PasswordAu'
+      line: PasswordAuthentication yes
+    delegate_to: '{{ item }}'
+    with_items:
+      - "{{ variable_group_hosts }}"
+
+  - name: Restart sshd service
+    service:
+      name: sshd
+      state: restarted    
+    delegate_to: '{{ item }}'
+    with_items:
+      - "{{ variable_group_hosts }}"
+
+  - name: Try ssh passwordless v1
+    command: "ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no -o PasswordAuthentication=no {{ ansible_user_root }}@{{ hostvars[item]['ansible_%s' | format(main_interface)].ipv4.address  }} hostname"
+    register: check_ssh_passwordless_v1
+    with_items:
+      - "{{ variable_group_hosts }}"    
+    ignore_errors: true
+
+  - name: Result try ssh passwordless v1
+    debug:
+      var: check_ssh_passwordless_v1
+
+  - name: Distribute ssh key to remote server user root
+    command: "sshpass -p {{ ansible_password_root }} ssh-copy-id -o StrictHostKeyChecking=no {{ ansible_user_root }}@{{ hostvars[item]['ansible_%s' | format(main_interface)].ipv4.address }}"
+    changed_when: "' Permission denied' not in check_ssh_passwordless_v1.results[0].stderr"
+    with_items:
+      - "{{ variable_group_hosts }}" 
+
+  - name: Try ssh passwordless v2
+    command: "ssh  -o ConnectTimeout=5 -o StrictHostKeyChecking=no -o PasswordAuthentication=no {{ ansible_user_root }}@{{ hostvars[item]['ansible_%s' | format(main_interface)].ipv4.address }} hostname"
+    with_items:
+      - "{{ variable_group_hosts }}"

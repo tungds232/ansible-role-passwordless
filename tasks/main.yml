@@ -1,0 +1,12 @@
+- name: Include OS-specific variables.
+  include_vars: "{{ ansible_os_family }}.yml"
+
+- include: main_RedHat.yml
+  when: ansible_os_family == 'RedHat'
+
+- include: main_Debian.yml
+  when: ansible_os_family == 'Debian'
+
+- include: main_Rocky.yml
+  when: ansible_os_family == 'Rocky'
+

@@ -1,0 +1,7 @@
+#- debug: msg={{ hostvars["192.168.60.7"].ansible_eth1.ipv4.address  }}
+        #test: '{{ vars['hostvars["' + targethost  + '"].ansible_' + main_interface + '.ipv4.address'] }}'
+- name: Run 
+  set_fact:
+    test: '{{ targethost }}'
+- debug: msg: {{ test }}    
+
