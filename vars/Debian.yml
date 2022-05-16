@@ -1,3 +1,6 @@
 ---
 #Var file for Debian os passwordless
+ansible_user_root: root
+ansible_password_root: Pass1234
+variable_group_hosts: "{{ groups['target_nodes'] }}"
 

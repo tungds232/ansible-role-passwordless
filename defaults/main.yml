@@ -1,4 +1,4 @@
 ansible_user_root: root
-ansible_password_root: '$6$NJavaSPYb$Kps5BVLVmpX/JdaNuI25.zGxiNaD3omrqCGQon.PVLlmt.iGLDPJrw821q7Zr7m3I9Zb34j9bmV3gs44mkDRA1'
+ansible_password_root: Pass1234
 main_interface: 'eth0'
 variable_group_hosts: "{{ groups['target_nodes'] }}"
